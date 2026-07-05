@@ -6,6 +6,7 @@ from telethon import TelegramClient, events
 from telethon.tl.types import KeyboardButtonUrl
 from collections import deque
 
+# Застосовуємо nest_asyncio для стабільної роботи циклів подій
 nest_asyncio.apply()
 
 # --- ВАШІ ДАНІ ---
@@ -77,10 +78,11 @@ async def handler(event):
         elif send_to_grain and target_grain_id:
             await client.send_message(target_grain_id, f"🌾 ЗЕРНО\nКультура: {', '.join(found_grain_tags)}\nЦіна: `{extract_price(event.text)}`\nКонтакт: {username}\n\n{event.text}", buttons=buttons)
 
+# WEB заглушка для Render
 async def handle(request): return web.Response(text="Bot is running")
 
 async def main():
-    # Запуск веб-сервера
+    # 1. Запускаємо веб-сервер
     app = web.Application()
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
@@ -88,14 +90,22 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-    # Запуск бота
+    # 2. Запускаємо бота
     await client.start()
     async for dialog in client.iter_dialogs():
         global target_grain_id, target_logistics_id
         if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
         if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
     
-    print("✅ Бот активний!"); await client.run_until_disconnected()
+    print("✅ Бот активний!")
+    await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    # Обертаємо в задачу для сумісності з Python 3.14
+    loop.create_task(main())
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
