@@ -1,19 +1,10 @@
-import asyncio
-# --- ПАТЧ ---
-if hasattr(asyncio, 'timeouts'):
-    async def fixed_wait_for(fut, timeout):
-        if timeout is None: return await fut
-        return await asyncio.wait_for(fut, timeout)
-    asyncio.wait_for = fixed_wait_for
-# ------------
-
 import re
+import asyncio
 import nest_asyncio
-import urllib.parse
-from collections import deque
 from aiohttp import web
 from telethon import TelegramClient, events
 from telethon.tl.types import KeyboardButtonUrl
+from collections import deque
 
 nest_asyncio.apply()
 
@@ -35,7 +26,7 @@ KEYWORDS_GRAIN = {
     'Соя': [r'\bсоя\b', r'\bсою\b', r'\bсої\b', r'\bсое\w*'], 'Просо': [r'\bпросо\b', r'\bпроса\b', r'\bпросу\b']
 }
 
-client = TelegramClient('agro_super_combo_v40', API_ID, API_HASH)
+client = TelegramClient('agro_session', API_ID, API_HASH)
 
 def extract_price(text):
     text_lower = text.lower()
@@ -88,7 +79,8 @@ async def handler(event):
 
 async def handle(request): return web.Response(text="Bot is running")
 
-async def start_bot_and_server():
+async def main():
+    # Запуск веб-сервера
     app = web.Application()
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
@@ -96,21 +88,14 @@ async def start_bot_and_server():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-    await client.connect()
-    if not await client.is_user_authorized():
-        qr_login = await client.qr_login()
-        print(f"QR для входу: {qr_login.url}")
-        await qr_login.wait()
-    
+    # Запуск бота
+    await client.start()
     async for dialog in client.iter_dialogs():
         global target_grain_id, target_logistics_id
         if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
         if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
+    
     print("✅ Бот активний!"); await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(start_bot_and_server())
-    try: loop.run_forever()
-    except KeyboardInterrupt: pass
+    asyncio.run(main())
