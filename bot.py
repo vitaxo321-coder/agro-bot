@@ -1,6 +1,5 @@
 import re
 import asyncio
-import qrcode
 import nest_asyncio
 import urllib.parse
 from collections import deque
@@ -19,10 +18,6 @@ TARGET_LOGISTICS_GROUP_NAME = 'Агро-Логістика'
 target_grain_id = None
 target_logistics_id = None
 PROCESSED_MESSAGES = deque(maxlen=200)
-
-# --- WEB ЗАГЛУШКА ДЛЯ RENDER ---
-async def handle(request):
-    return web.Response(text="Bot is running")
 
 KEYWORDS_GRAIN = {
     'Пшениця': [r'пшениц\w*'], 'Фураж': [r'фураж', r'кормов\w*'],
@@ -83,30 +78,29 @@ async def handler(event):
         elif send_to_grain and target_grain_id:
             await client.send_message(target_grain_id, f"🌾 ЗЕРНО\nКультура: {', '.join(found_grain_tags)}\nЦіна: `{extract_price(event.text)}`\nКонтакт: {username}\n\n{event.text}", buttons=buttons)
 
+# --- WEB ЗАГЛУШКА ---
+async def handle(request): return web.Response(text="Bot is running")
+
 async def main():
+    # Запуск веб-сервера
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    await site.start()
+    
     await client.connect()
     if not await client.is_user_authorized():
         qr_login = await client.qr_login()
         print(f"QR для входу: {qr_login.url}"); await qr_login.wait()
+    
     async for dialog in client.iter_dialogs():
         global target_grain_id, target_logistics_id
         if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
         if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
+    
     print("✅ Бот активний!"); await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    # Запуск WEB-сервера (для Render)
-    app = web.Application()
-    app.router.add_get('/', handle)
-    runner = web.AppRunner(app)
-    loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, '0.0.0.0', 10000)
-    loop.run_until_complete(site.start())
-    
-    # Запуск бота
-    task = loop.create_task(main())
-    print("🚀 Бот і веб-сервер запущені!")
-    loop.run_forever()
+    asyncio.run(main())
