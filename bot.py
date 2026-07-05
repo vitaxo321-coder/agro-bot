@@ -78,11 +78,9 @@ async def handler(event):
         elif send_to_grain and target_grain_id:
             await client.send_message(target_grain_id, f"🌾 ЗЕРНО\nКультура: {', '.join(found_grain_tags)}\nЦіна: `{extract_price(event.text)}`\nКонтакт: {username}\n\n{event.text}", buttons=buttons)
 
-# --- WEB ЗАГЛУШКА ---
 async def handle(request): return web.Response(text="Bot is running")
 
-async def main():
-    # Запуск веб-сервера
+async def start_bot_and_server():
     app = web.Application()
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
@@ -93,14 +91,18 @@ async def main():
     await client.connect()
     if not await client.is_user_authorized():
         qr_login = await client.qr_login()
-        print(f"QR для входу: {qr_login.url}"); await qr_login.wait()
+        print(f"QR для входу: {qr_login.url}")
+        await qr_login.wait()
     
     async for dialog in client.iter_dialogs():
         global target_grain_id, target_logistics_id
         if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
         if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
-    
     print("✅ Бот активний!"); await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(start_bot_and_server())
+    try: loop.run_forever()
+    except KeyboardInterrupt: pass
