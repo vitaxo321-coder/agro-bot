@@ -1,5 +1,0 @@
-telethon==1.36.0
-cryptg
-qrcode
-nest_asyncio
-aiohttp
