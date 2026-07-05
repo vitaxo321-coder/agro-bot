@@ -79,8 +79,22 @@ async def handler(event):
 
 async def handle(request): return web.Response(text="Bot is running")
 
+async def auth_task():
+    await client.connect()
+    if not await client.is_user_authorized():
+        print("--- ПОТРІБНА АВТОРИЗАЦІЯ ---")
+        qr = await client.qr_login()
+        print(f"✅ Скопіюйте це посилання в браузер: https://qr.telegram.org/a/{qr.token.hex()}")
+        await qr.wait()
+        print("✅ Авторизовано успішно!")
+    
+    async for dialog in client.iter_dialogs():
+        global target_grain_id, target_logistics_id
+        if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
+        if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
+    print("🚀 Бот повністю готовий до роботи!")
+
 async def main():
-    # 1. Запуск сервера
     app = web.Application()
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
@@ -88,26 +102,8 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-  # 2. Правильна послідовна авторизація
-    await client.connect()
-    if not await client.is_user_authorized():
-        print("--- ПОТРІБНА АВТОРИЗАЦІЯ ---")
-        qr = await client.qr_login()
-        # ВИВЕДЕННЯ ПОСИЛАННЯ В БРАУЗЕРНУ ФОРМУ
-        print(f"✅ QR-КОД ГОТОВИЙ!")
-        print(f"Скопіюйте це посилання в браузер: https://qr.telegram.org/a/{qr.token.hex()}")
-        await qr.wait()
-        print("✅ Авторизовано!")
-    else:
-        print("✅ Сесія знайдена!")
-    
-    # 3. Ініціалізація груп
-    async for dialog in client.iter_dialogs():
-        global target_grain_id, target_logistics_id
-        if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
-        if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
-    
-    print("🚀 Бот повністю запущений!")
+    asyncio.create_task(auth_task())
+    print("✅ Web-сервер запущений, чекаємо авторизацію...")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
