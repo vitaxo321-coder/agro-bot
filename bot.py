@@ -1,5 +1,13 @@
-import re
 import asyncio
+# --- ПАТЧ ---
+if hasattr(asyncio, 'timeouts'):
+    async def fixed_wait_for(fut, timeout):
+        if timeout is None: return await fut
+        return await asyncio.wait_for(fut, timeout)
+    asyncio.wait_for = fixed_wait_for
+# ------------
+
+import re
 import nest_asyncio
 import urllib.parse
 from collections import deque
