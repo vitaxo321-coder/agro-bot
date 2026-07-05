@@ -87,20 +87,21 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-    # Авторизація без введення через консоль
     await client.connect()
+    # Авторизація з дуже великим таймаутом
     if not await client.is_user_authorized():
+        print("--- ОЧІКУЮ ВХІД ---")
         qr_login = await client.qr_login()
         print(f"QR для входу: {qr_login.url}")
-        await qr_login.wait()
+        # Чекаємо без жорсткого таймауту
+        await qr_login.wait(timeout=None)
     
     async for dialog in client.iter_dialogs():
         global target_grain_id, target_logistics_id
         if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
         if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
     
-    print("✅ Бот активний!")
-    await client.run_until_disconnected()
+    print("✅ Бот активний!"); await client.run_until_disconnected()
 
 if __name__ == '__main__':
     loop = asyncio.new_event_loop()
