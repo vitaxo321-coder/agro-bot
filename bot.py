@@ -4,6 +4,7 @@ import qrcode
 import nest_asyncio
 import urllib.parse
 from collections import deque
+from aiohttp import web
 from telethon import TelegramClient, events
 from telethon.tl.types import KeyboardButtonUrl
 
@@ -19,17 +20,16 @@ target_grain_id = None
 target_logistics_id = None
 PROCESSED_MESSAGES = deque(maxlen=200)
 
+# --- WEB ЗАГЛУШКА ДЛЯ RENDER ---
+async def handle(request):
+    return web.Response(text="Bot is running")
+
 KEYWORDS_GRAIN = {
     'Пшениця': [r'пшениц\w*'], 'Фураж': [r'фураж', r'кормов\w*'],
     'Соняшник': [r'соняшник\w*', r'подсолнух\w*', r'сеmechк\w*', r'семечек\b'],
     'Кукурудза': [r'кукурудз\w*', r'кукуруз\w*', r'кук\b'], 'Ячмінь': [r'ячmen\w*', r'ячмін\w*'],
     'Ріпак': [r'ріпак\w*', r'рапс\w*'], 'Горох': [r'горох\w*'],
     'Соя': [r'\bсоя\b', r'\bсою\b', r'\bсої\b', r'\bсое\w*'], 'Просо': [r'\bпросо\b', r'\bпроса\b', r'\bпросу\b']
-}
-
-KEYWORDS_LOGISTICS = {
-    'Порти / Елеватори': [r'порт\w*', r'элеватор\w*', r'ізмаїл', r'измаил', r'рені', r'рени', r'одес\w*', r'чорноморськ', r'черноморск', r'южн\w*', r'тиса', r'силос\w*'],
-    'Зерновози / Самоскиди': [r'зерновоз\w*', r'самосвал\w*', r'самоскид\w*', r'сцепк\w*', r'зчепк\w*', r'тенда\w*', r'штора\w*', r'контейнеровоз\w*', r'тягач\w*', r'камаз\w*']
 }
 
 client = TelegramClient('agro_super_combo_v40', API_ID, API_HASH)
@@ -57,14 +57,12 @@ async def handler(event):
     if any(trash in text_lower for trash in trash_triggers): return
 
     send_to_grain, send_to_logistics = False, False
-    found_grain_tags, found_log_tags = [], []
+    found_grain_tags = []
 
-    # Логіка логістики
     transport_words = ['зерновоз', 'самосвал', 'самоскид', 'сцепк', 'тенда', 'контейнеровоз', 'фрахт', 'потрібен транспорт']
     if any(tw in text_lower for tw in transport_words) and any(rw in text_lower for rw in ['завантаження', 'погрузка', 'маршрут', 'доставка']):
         send_to_logistics = True
     
-    # Логіка зерна
     for category, regex_list in KEYWORDS_GRAIN.items():
         for regex in regex_list:
             if re.search(regex, text_lower):
@@ -99,6 +97,16 @@ async def main():
 if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    
+    # Запуск WEB-сервера (для Render)
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    loop.run_until_complete(runner.setup())
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    loop.run_until_complete(site.start())
+    
+    # Запуск бота
     task = loop.create_task(main())
-    try: loop.run_forever()
-    except KeyboardInterrupt: pass
+    print("🚀 Бот і веб-сервер запущені!")
+    loop.run_forever()
