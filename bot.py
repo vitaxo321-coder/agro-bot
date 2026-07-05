@@ -88,12 +88,14 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-    # 2. Правильна послідовна авторизація
+  # 2. Правильна послідовна авторизація
     await client.connect()
     if not await client.is_user_authorized():
         print("--- ПОТРІБНА АВТОРИЗАЦІЯ ---")
         qr = await client.qr_login()
-        print(f"QR для входу: {qr.url}")
+        # ВИВЕДЕННЯ ПОСИЛАННЯ В БРАУЗЕРНУ ФОРМУ
+        print(f"✅ QR-КОД ГОТОВИЙ!")
+        print(f"Скопіюйте це посилання в браузер: https://qr.telegram.org/a/{qr.token.hex()}")
         await qr.wait()
         print("✅ Авторизовано!")
     else:
