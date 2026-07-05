@@ -23,7 +23,7 @@ KEYWORDS_GRAIN = {
     'Соняшник': [r'соняшник\w*', r'подсолнух\w*', r'сеmechк\w*', r'семечек\b'],
     'Кукурудза': [r'кукурудз\w*', r'кукуруз\w*', r'кук\b'], 'Ячмінь': [r'ячmen\w*', r'ячмін\w*'],
     'Ріпак': [r'ріпак\w*', r'рапс\w*'], 'Горох': [r'горох\w*'],
-    'Соя': [r'\bсоя\b', r'\bсою\b', r'\bсої\b', r'\bсое\w*'], 'Просо': [r'\bпросо\b', r'\bпроса\b', r'\bпросу\b']
+    'Соя': [r'\bсоя\b', '\bсою\b', '\bсої\b', '\bсое\w*'], 'Просо': [r'\bпросо\b', r'\bпроса\b', r'\bпросу\b']
 }
 
 client = TelegramClient('agro_session', API_ID, API_HASH)
@@ -79,6 +79,19 @@ async def handler(event):
 
 async def handle(request): return web.Response(text="Bot is running")
 
+async def run_auth():
+    await client.connect()
+    if not await client.is_user_authorized():
+        qr = await client.qr_login()
+        print(f"QR для входу: {qr.url}")
+        await qr.wait()
+        print("✅ Авторизовано!")
+    
+    async for dialog in client.iter_dialogs():
+        global target_grain_id, target_logistics_id
+        if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
+        if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
+
 async def main():
     app = web.Application()
     app.router.add_get('/', handle)
@@ -87,27 +100,12 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', 10000)
     await site.start()
     
-    await client.connect()
-    # Авторизація з дуже великим таймаутом
-    if not await client.is_user_authorized():
-        print("--- ОЧІКУЮ ВХІД ---")
-        qr_login = await client.qr_login()
-        print(f"QR для входу: {qr_login.url}")
-        # Чекаємо без жорсткого таймауту
-        await qr_login.wait(timeout=None)
-    
-    async for dialog in client.iter_dialogs():
-        global target_grain_id, target_logistics_id
-        if dialog.name == TARGET_GRAIN_GROUP_NAME: target_grain_id = dialog.id
-        if dialog.name == TARGET_LOGISTICS_GROUP_NAME: target_logistics_id = dialog.id
-    
-    print("✅ Бот активний!"); await client.run_until_disconnected()
+    # Запускаємо авторизацію окремою задачею, щоб не блокувати сервер
+    asyncio.create_task(run_auth())
+    print("✅ Бот активний (авторизація у фоні)!")
+    await client.run_until_disconnected()
 
 if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.create_task(main())
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        pass
+    loop.run_until_complete(main())
